@@ -68,7 +68,7 @@ Sou um consultor financeiro. Aqui estão os dados do cliente:
 Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc), e quais estratégias pode seguir para alcançar seu objetivo.
 """
         try:
-            resposta = client.text_generation(prompt, max_new_tokens=300)
+            resposta = client.text_generation(prompt, max_new_tokens=2496, temperature=0.7)
             st.subheader("🤖 Sugestão da IA")
             st.write(resposta)
         except Exception as e:
