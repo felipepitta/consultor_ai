@@ -28,7 +28,7 @@ reserva_emergencia = custo_mensal * 6
 
 # Parâmetros de retorno e prazos
 retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
-prazos = [3, 5, 10]  # anos
+prazos = [3, 5, 10, 15, 30]  # anos
 
 # Simulações com juros compostos corretamente aplicados
 resultados = {}
