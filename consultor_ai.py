@@ -5,7 +5,7 @@ import os
 
 # Configurar chave da Hugging Face (você pode armazenar em st.secrets ou variáveis de ambiente)
 hf_key = st.secrets["HUGGINGFACEHUB_API_TOKEN"] if "HUGGINGFACEHUB_API_TOKEN" in st.secrets else os.getenv("HUGGINGFACEHUB_API_TOKEN")
-client = InferenceClient(model="google/flan-t5-large", token=hf_key)
+client = InferenceClient(model="mistralai/Mistral-7B-Instruct-v0.1", token=hf_key)
 
 st.set_page_config(page_title="Consultor de Investimentos IA", layout="centered")
 st.title("🤖 Consultor Inteligente de Investimentos")
@@ -28,7 +28,7 @@ reserva_emergencia = custo_mensal * 6
 
 # Parâmetros de retorno e prazos
 retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
-prazos = [3, 5, 10, 15, 20, 30, 35]  # anos
+prazos = [3, 5, 10]  # anos
 
 # Simulações
 resultados = {}
@@ -56,19 +56,16 @@ st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ 
 # Sugestão personalizada via IA (HuggingFace)
 if st.button("🔍 Obter sugestão personalizada da IA"):
     with st.spinner("Consultando IA gratuita (Hugging Face)..."):
-        prompt = f"""
-Sou um consultor financeiro. Aqui estão os dados do cliente:
-- Renda mensal: R$ {renda_mensal}
-- Custo mensal: R$ {custo_mensal}
-- Aporte mensal: R$ {aporte_mensal}
-- Reserva de emergência: R$ {reserva_emergencia}
-- Perfil: {perfil}
-- Objetivo: {objetivo}
-
-Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc), e quais estratégias pode seguir para alcançar seu objetivo.
-"""
+        prompt = (
+            f"O cliente possui uma renda mensal de R$ {renda_mensal}, "
+            f"gasta R$ {custo_mensal} por mês, investe R$ {aporte_mensal} mensalmente "
+            f"e possui uma reserva de emergência de R$ {reserva_emergencia:.2f}. "
+            f"Seu perfil de investidor é '{perfil}' e seu objetivo é: {objetivo}. "
+            "Quais sugestões de investimentos (ativos e estratégias) você daria para ele, "
+            "considerando seu perfil e objetivo?"
+        )
         try:
-            resposta = client.text_generation(prompt, max_new_tokens=249, temperature=0.7)
+            resposta = client.text_generation(prompt, max_new_tokens=300)
             st.subheader("🤖 Sugestão da IA")
             st.write(resposta)
         except Exception as e:
