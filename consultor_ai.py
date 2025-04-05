@@ -5,7 +5,7 @@ import os
 
 # Configurar chave da Hugging Face (você pode armazenar em st.secrets ou variáveis de ambiente)
 hf_key = st.secrets["HUGGINGFACEHUB_API_TOKEN"] if "HUGGINGFACEHUB_API_TOKEN" in st.secrets else os.getenv("HUGGINGFACEHUB_API_TOKEN")
-client = InferenceClient(model="deepseek-ai/deepseek-coder-6.7b-instruct", token=hf_key)
+client = InferenceClient(model="google/flan-t5-large", token=hf_key)
 
 st.set_page_config(page_title="Consultor de Investimentos IA", layout="centered")
 st.title("🤖 Consultor Inteligente de Investimentos")
@@ -28,7 +28,7 @@ reserva_emergencia = custo_mensal * 6
 
 # Parâmetros de retorno e prazos
 retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
-prazos = [3, 5, 10]  # anos
+prazos = [3, 5, 10, 15, 20, 30, 35]  # anos
 
 # Simulações
 resultados = {}
