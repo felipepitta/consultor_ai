@@ -28,7 +28,7 @@ reserva_emergencia = custo_mensal * 6
 
 # Parâmetros de retorno e prazos
 retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
-prazos = [3, 5, 10, 15, 30]  # anos
+prazos = [3, 5, 10]  # anos
 
 # Simulações com juros compostos corretamente aplicados
 resultados = {}
@@ -44,12 +44,11 @@ for r in retornos:
         valores.append(round(total, 2))
     resultados[f"{int(r*1000)/10}% a.a"] = valores
 
-
-# Gráfico de linhas
+# Gráfico de linhas suavizadas
 st.subheader("📈 Projeções de Crescimento Patrimonial")
 fig = go.Figure()
 for label, values in resultados.items():
-    fig.add_trace(go.Scatter(x=prazos, y=values, mode='lines+markers', name=label))
+    fig.add_trace(go.Scatter(x=prazos, y=values, mode='lines+markers', name=label, line_shape='spline'))
 fig.update_layout(xaxis_title="Prazo (anos)", yaxis_title="R$ Acumulado", height=500)
 st.plotly_chart(fig)
 
@@ -61,12 +60,14 @@ st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ 
 if st.button("🔍 Obter sugestão personalizada da IA"):
     with st.spinner("Consultando IA gratuita (Hugging Face)..."):
         prompt = (
-            f"O cliente possui uma renda mensal de R$ {renda_mensal}, "
-            f"gasta R$ {custo_mensal} por mês, investe R$ {aporte_mensal} mensalmente "
-            f"e possui uma reserva de emergência de R$ {reserva_emergencia:.2f}. "
-            f"Seu perfil de investidor é '{perfil}' e seu objetivo é: {objetivo}. "
-            "Quais sugestões de investimentos (ativos e estratégias) você daria para ele, "
-            "considerando seu perfil e objetivo?"
+            f"Sou um consultor financeiro. Aqui estão os dados do cliente:\n"
+            f"- Renda mensal: R$ {renda_mensal}\n"
+            f"- Custo mensal: R$ {custo_mensal}\n"
+            f"- Aporte mensal: R$ {aporte_mensal}\n"
+            f"- Reserva de emergência: R$ {reserva_emergencia:.2f}\n"
+            f"- Perfil de investidor: {perfil}\n"
+            f"- Objetivo financeiro: {objetivo}\n"
+            f"Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc) e quais estratégias pode seguir para alcançar seu objetivo."
         )
         try:
             resposta = client.text_generation(prompt, max_new_tokens=300)
