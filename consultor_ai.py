@@ -1,10 +1,11 @@
 import streamlit as st
 import plotly.graph_objects as go
-import openai
 import os
+from openai import OpenAI
 
-# Configurar a API Key da OpenAI (lembre de usar secrets no deploy)
-openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
+# Criar cliente da OpenAI com a chave da API
+api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
 
 st.set_page_config(page_title="Consultor de Investimentos IA", layout="centered")
 st.title("🤖 Consultor Inteligente de Investimentos")
@@ -36,7 +37,7 @@ for r in retornos:
         total = 0
         for i in range(t * 12):
             total = (total + aporte_mensal) * (1 + r / 12)
-        resultados[f"Retorno {int(r*100)}% a.a - {t} anos"] = round(total, 2)
+        resultados[f"Retorno {int(r*1000)/10}% a.a - {t} anos"] = round(total, 2)
 
 # Gráfico
 st.subheader("📈 Simulações de crescimento do investimento")
@@ -64,10 +65,12 @@ Sou um consultor financeiro. Aqui estão os dados do cliente:
 Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc), e quais estratégias pode seguir para alcançar seu objetivo.
 """
         try:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "system", "content": "Você é um consultor financeiro."},
-                         {"role": "user", "content": prompt}]
+                messages=[
+                    {"role": "system", "content": "Você é um consultor financeiro."},
+                    {"role": "user", "content": prompt}
+                ]
             )
             st.subheader("🤖 Sugestão da IA")
             st.write(response.choices[0].message.content)
