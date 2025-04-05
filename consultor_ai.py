@@ -1,78 +1,80 @@
 import streamlit as st
 import plotly.graph_objects as go
-import numpy as np
+import openai
+import os
 
-st.set_page_config(page_title="Consultor AI", layout="wide")
-st.title("🤖 Consultor de Investimentos com IA")
+# Configurar a API Key da OpenAI (lembre de usar secrets no deploy)
+openai.api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
+
+st.set_page_config(page_title="Consultor de Investimentos IA", layout="centered")
+st.title("🤖 Consultor Inteligente de Investimentos")
+
 st.markdown("""
-Este app ajuda você a definir uma estratégia de reserva de emergência e de investimentos com base na sua realidade financeira.
+Este assistente te ajuda a entender quanto investir por mês e como seu patrimônio pode evoluir com o tempo. 
+Além disso, a inteligência artificial te dá sugestões com base no seu perfil e objetivos.
 """)
 
-# Inicializa os valores dos campos na sessão
-campos = {
-    'renda_mensal': 0.0,
-    'despesa_mensal': 0.0,
-    'valor_reserva_desejada': 0.0,
-    'aporte_mensal': 0.0,
-    'perfil': 'Moderado'
-}
+st.subheader("Preencha suas informações abaixo:")
 
-for campo in campos:
-    if campo not in st.session_state:
-        st.session_state[campo] = campos[campo]
+renda_mensal = st.number_input("Renda mensal (R$)", min_value=0.0, format="%.2f", help="Sua renda mensal líquida.")
+custo_mensal = st.number_input("Custo mensal de vida (R$)", min_value=0.0, format="%.2f", help="Gastos mensais médios com moradia, alimentação, transporte, etc.")
+aporte_mensal = st.number_input("Aporte mensal (R$)", min_value=0.0, format="%.2f", help="Quanto pretende investir por mês.")
+perfil = st.selectbox("Perfil de investidor", ["Conservador", "Moderado", "Arrojado"], help="Seu apetite ao risco: Conservador, Moderado ou Arrojado.")
+objetivo = st.text_area("Objetivo financeiro", help="Ex: comprar uma casa, aposentadoria, liberdade financeira, etc.")
 
-# Layout
-col1, col2 = st.columns(2)
+# Cálculo da reserva de emergência automaticamente
+reserva_emergencia = custo_mensal * 6
 
-with col1:
-    st.session_state['renda_mensal'] = st.number_input("Renda Mensal (R$)", value=st.session_state['renda_mensal'], step=100.0, format="%.2f")
-    st.session_state['despesa_mensal'] = st.number_input("Despesas Mensais (R$)", value=st.session_state['despesa_mensal'], step=100.0, format="%.2f")
-    st.session_state['valor_reserva_desejada'] = st.number_input("Reserva de Emergência Desejada (R$)", value=st.session_state['valor_reserva_desejada'], step=100.0, format="%.2f")
+# Parâmetros de retorno e prazos
+retornos = [0.05, 0.075, 0.10]
+prazos = [3, 5, 10]
 
-with col2:
-    st.session_state['aporte_mensal'] = st.number_input("Aporte Mensal (R$)", value=st.session_state['aporte_mensal'], step=100.0, format="%.2f")
-    st.session_state['perfil'] = st.selectbox("Perfil de Investidor", ["Conservador", "Moderado", "Arrojado"], index=["Conservador", "Moderado", "Arrojado"].index(st.session_state['perfil']))
+# Simulações
+resultados = {}
+for r in retornos:
+    for t in prazos:
+        total = 0
+        for i in range(t * 12):
+            total = (total + aporte_mensal) * (1 + r / 12)
+        resultados[f"Retorno {int(r*100)}% a.a - {t} anos"] = round(total, 2)
 
-# Botão de limpar campos
-if st.button("🧹 Limpar Campos"):
-    for campo in campos:
-        st.session_state[campo] = campos[campo]
+# Gráfico
+st.subheader("📈 Simulações de crescimento do investimento")
+fig = go.Figure()
+fig.add_trace(go.Bar(x=list(resultados.keys()), y=list(resultados.values()), name="Valor Futuro"))
+fig.update_layout(xaxis_title="Cenário", yaxis_title="R$ Acumulado", height=500)
+st.plotly_chart(fig)
+
+# Mostrar reserva de emergência
+st.subheader("🔒 Reserva de Emergência Ideal")
+st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ {reserva_emergencia:,.2f}**")
+
+# Requisição à OpenAI com sugestões
+if st.button("🔍 Obter sugestão personalizada da IA"):
+    with st.spinner("Consultando IA..."):
+        prompt = f"""
+Sou um consultor financeiro. Aqui estão os dados do cliente:
+- Renda mensal: R$ {renda_mensal}
+- Custo mensal: R$ {custo_mensal}
+- Aporte mensal: R$ {aporte_mensal}
+- Reserva de emergência: R$ {reserva_emergencia}
+- Perfil: {perfil}
+- Objetivo: {objetivo}
+
+Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc), e quais estratégias pode seguir para alcançar seu objetivo.
+"""
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "system", "content": "Você é um consultor financeiro."},
+                         {"role": "user", "content": prompt}]
+            )
+            st.subheader("🤖 Sugestão da IA")
+            st.write(response.choices[0].message.content)
+        except Exception as e:
+            st.error(f"Erro ao consultar a IA: {e}")
+
+# Botão limpar
+if st.button("🧹 Limpar"):
+    st.cache_data.clear()
     st.experimental_rerun()
-
-# Função de cálculo de evolução do capital
-@st.cache_data
-def calcular_evolucao(valor_inicial, aporte_mensal, taxa_juros, anos):
-    meses = anos * 12
-    valores = []
-    montante = valor_inicial
-    for i in range(meses):
-        montante *= (1 + taxa_juros / 12)
-        montante += aporte_mensal
-        valores.append(montante)
-    return valores
-
-# Cálculo e gráficos
-if st.session_state['aporte_mensal'] > 0:
-    retornos = [0.05, 0.07, 0.09, 0.12]  # 5%, 7%, 9%, 12%
-    prazos = [("Curto Prazo (3 anos)", 3), ("Médio Prazo (5 anos)", 5), ("Longo Prazo (10 anos)", 10)]
-
-    fig = go.Figure()
-
-    for taxa in retornos:
-        for nome_prazo, anos in prazos:
-            valores = calcular_evolucao(0, st.session_state['aporte_mensal'], taxa, anos)
-            fig.add_trace(go.Scatter(y=valores, mode='lines', name=f"{int(taxa*100)}% a.a. - {nome_prazo}"))
-
-    fig.update_layout(title="Evolução do Patrimônio Acumulado", xaxis_title="Meses", yaxis_title="Valor Acumulado (R$)", height=600)
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.success("📊 Escolha uma curva de evolução conforme seu objetivo de prazo e expectativa de retorno!")
-
-# Em breve: Sugestão de carteira com IA
-st.markdown("""
-### 🤖 Recomendação Inteligente (em desenvolvimento)
-Futuramente, este app usará inteligência artificial para sugerir:
-- Alocação ideal de ativos (Renda fixa, ações, fundos, ETFs, etc.)
-- Diversificação com base no perfil de risco
-- Rebalanceamento e acompanhamento periódico
-""")
