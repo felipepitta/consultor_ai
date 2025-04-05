@@ -54,23 +54,23 @@ st.plotly_chart(fig)
 
 # Mostrar reserva de emergência
 st.subheader("🔒 Reserva de Emergência Ideal")
-st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ {reserva_emergencia:,.2f}**")
+st.write(f"Com base em seus custos mensais, sua reserva de emergência ideal é de **R$ {reserva_emergencia:,.2f}**")
 
 # Sugestão personalizada via IA (HuggingFace)
 if st.button("🔍 Obter sugestão personalizada da IA"):
-    with st.spinner("Consultando IA gratuita (Hugging Face)..."):
+    with st.spinner("Analisando..."):
         prompt = (
-            f"Sou um consultor financeiro. Aqui estão os dados do cliente:\n"
+            f"Dados do cliente:\n"
             f"- Renda mensal: R$ {renda_mensal}\n"
             f"- Custo mensal: R$ {custo_mensal}\n"
             f"- Aporte mensal: R$ {aporte_mensal}\n"
             f"- Reserva de emergência: R$ {reserva_emergencia:.2f}\n"
             f"- Perfil de investidor: {perfil}\n"
-            f"- Objetivo financeiro: {objetivo}\n"
-            f"Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc) e quais estratégias pode seguir para alcançar seu objetivo."
+            f"- Objetivo financeiro: {objetivo}\n\n"
+            f"Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos imobiliarios, etc) e quais estratégias pode seguir para alcançar seu objetivo."
         )
         try:
-            resposta = client.text_generation(prompt, max_new_tokens=300)
+            resposta = client.text_generation(prompt, max_new_tokens=1000)
             st.subheader("🤖 Sugestão da IA")
             st.write(resposta)
         except Exception as e:
