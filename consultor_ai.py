@@ -70,7 +70,7 @@ if st.button("🔍 Obter sugestão personalizada da IA"):
             f"Objetivo financeiro: {objetivo}"
         )
         try:
-            resposta = client.text_generation(prompt, max_new_tokens=300)
+            resposta = client.text_generation(prompt, max_new_tokens=1000, temperature=0.7)
             resposta_formatada = resposta.strip()
             if prompt in resposta_formatada:
                 resposta_formatada = resposta_formatada.replace(prompt, "").strip()
