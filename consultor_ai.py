@@ -1,11 +1,11 @@
 import streamlit as st
 import plotly.graph_objects as go
+from huggingface_hub import InferenceClient
 import os
-from openai import OpenAI
 
-# Criar cliente da OpenAI com a chave da API
-api_key = st.secrets["OPENAI_API_KEY"] if "OPENAI_API_KEY" in st.secrets else os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key)
+# Configurar chave da Hugging Face (você pode armazenar em st.secrets ou variáveis de ambiente)
+hf_key = st.secrets["HUGGINGFACEHUB_API_TOKEN"] if "HUGGINGFACEHUB_API_TOKEN" in st.secrets else os.getenv("HUGGINGFACEHUB_API_TOKEN")
+client = InferenceClient(model="deepseek-ai/deepseek-coder-6.7b-instruct", token=hf_key)
 
 st.set_page_config(page_title="Consultor de Investimentos IA", layout="centered")
 st.title("🤖 Consultor Inteligente de Investimentos")
@@ -27,32 +27,35 @@ objetivo = st.text_area("Objetivo financeiro", help="Ex: comprar uma casa, apose
 reserva_emergencia = custo_mensal * 6
 
 # Parâmetros de retorno e prazos
-retornos = [0.05, 0.075, 0.10]
-prazos = [3, 5, 10]
+retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
+prazos = [3, 5, 10]  # anos
 
 # Simulações
 resultados = {}
 for r in retornos:
-    for t in prazos:
+    valores = []
+    for t in range(1, max(prazos) + 1):
         total = 0
         for i in range(t * 12):
             total = (total + aporte_mensal) * (1 + r / 12)
-        resultados[f"Retorno {int(r*1000)/10}% a.a - {t} anos"] = round(total, 2)
+        valores.append(round(total, 2))
+    resultados[f"{int(r*1000)/10}% a.a"] = valores
 
-# Gráfico
-st.subheader("📈 Simulações de crescimento do investimento")
+# Gráfico de linhas
+st.subheader("📈 Projeções de Crescimento Patrimonial")
 fig = go.Figure()
-fig.add_trace(go.Bar(x=list(resultados.keys()), y=list(resultados.values()), name="Valor Futuro"))
-fig.update_layout(xaxis_title="Cenário", yaxis_title="R$ Acumulado", height=500)
+for label, values in resultados.items():
+    fig.add_trace(go.Scatter(x=prazos, y=values, mode='lines+markers', name=label))
+fig.update_layout(xaxis_title="Prazo (anos)", yaxis_title="R$ Acumulado", height=500)
 st.plotly_chart(fig)
 
 # Mostrar reserva de emergência
 st.subheader("🔒 Reserva de Emergência Ideal")
 st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ {reserva_emergencia:,.2f}**")
 
-# Requisição à OpenAI com sugestões
+# Sugestão personalizada via IA (HuggingFace)
 if st.button("🔍 Obter sugestão personalizada da IA"):
-    with st.spinner("Consultando IA..."):
+    with st.spinner("Consultando IA gratuita (Hugging Face)..."):
         prompt = f"""
 Sou um consultor financeiro. Aqui estão os dados do cliente:
 - Renda mensal: R$ {renda_mensal}
@@ -65,15 +68,9 @@ Sou um consultor financeiro. Aqui estão os dados do cliente:
 Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc), e quais estratégias pode seguir para alcançar seu objetivo.
 """
         try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Você é um consultor financeiro."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
+            resposta = client.text_generation(prompt, max_new_tokens=300)
             st.subheader("🤖 Sugestão da IA")
-            st.write(response.choices[0].message.content)
+            st.write(resposta)
         except Exception as e:
             st.error(f"Erro ao consultar a IA: {e}")
 
