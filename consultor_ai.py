@@ -1,134 +1,78 @@
-from datetime import datetime
-from typing import Literal
-import math
-import uuid
-import sqlite3
 import streamlit as st
 import plotly.graph_objects as go
-import locale
+import numpy as np
 
-locale.setlocale(locale.LC_ALL, '')
-
-# --- Banco de dados SQLite ---
-conn = sqlite3.connect("usuarios.db", check_same_thread=False)
-cursor = conn.cursor()
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS usuarios (
-    id TEXT PRIMARY KEY,
-    timestamp TEXT,
-    despesa_mensal REAL,
-    tipo_trabalho TEXT,
-    n_dependentes INTEGER,
-    valor_atual REAL,
-    meta REAL,
-    prazo_anos REAL,
-    aporte_atual REAL,
-    taxa_retorno_anual REAL,
-    reserva_ideal REAL,
-    aporte_necessario REAL,
-    tempo_estimado REAL
-)
-''')
-conn.commit()
-
-# --- Funções de cálculo ---
-def calcular_reserva(despesa_mensal, tipo_trabalho, n_dependentes):
-    meses_reserva = 6 if tipo_trabalho.lower() == 'clt' else 12
-    reserva = (despesa_mensal * meses_reserva) + (n_dependentes * 1000)
-    return reserva
-
-def calcular_aporte_necessario(meta, prazo_anos, taxa_retorno_anual):
-    i = taxa_retorno_anual / 12 / 100
-    n = prazo_anos * 12
-    if n == 0:
-        return 0
-    if i == 0:
-        return meta / n
-    aporte = meta * i / ((1 + i) ** n - 1)
-    return aporte
-
-def calcular_tempo_para_meta(valor_atual, aporte_mensal, taxa_retorno_anual, meta):
-    i = taxa_retorno_anual / 12 / 100
-    saldo = valor_atual
-    meses = 0
-    while saldo < meta and meses < 1000:
-        saldo = saldo * (1 + i) + aporte_mensal
-        meses += 1
-    anos = meses / 12
-    return round(anos, 1)
-
-# --- Interface Streamlit ---
-st.set_page_config(page_title="Consultor-AI", page_icon="🤖💰")
-st.title("Consultor-AI 🤖💰")
-
+st.set_page_config(page_title="Consultor AI", layout="wide")
+st.title("🤖 Consultor de Investimentos com IA")
 st.markdown("""
-Este é o seu consultor financeiro inteligente. Preencha os dados abaixo para obter sua reserva de emergência ideal,
-quanto você precisa aportar mensalmente e por quanto tempo para atingir sua meta financeira.
+Este app ajuda você a definir uma estratégia de reserva de emergência e de investimentos com base na sua realidade financeira.
 """)
 
-with st.form("simulador_form"):
-    despesa_mensal = st.number_input("Despesa Mensal", min_value=0.0, help="Inclua todas as suas despesas mensais como aluguel, comida, transporte, etc.")
-    tipo_trabalho = st.selectbox("Tipo de Trabalho", ["CLT", "Autônomo"], help="Se você trabalha registrado, selecione CLT. Caso contrário, escolha Autônomo.")
-    n_dependentes = st.number_input("Número de Dependentes", min_value=0, step=1, help="Quantas pessoas dependem financeiramente de você?")
-    valor_atual = st.number_input("Valor Atual Investido", min_value=0.0, help="Quanto você já tem investido para sua meta?")
-    meta = st.number_input("Meta Financeira (R$)", min_value=0.0, help="Qual o valor final que você deseja atingir?")
-    prazo_anos = st.number_input("Prazo (anos)", min_value=0.0, help="Em quantos anos você deseja atingir sua meta?")
-    aporte_atual = st.number_input("Aporte Mensal Atual", min_value=0.0, help="Quanto você já consegue investir por mês atualmente?")
-    taxa_retorno_anual = st.number_input("Taxa de Retorno Anual (%)", min_value=0.0, help="Qual a taxa de retorno anual esperada dos seus investimentos?")
+# Inicializa os valores dos campos na sessão
+campos = {
+    'renda_mensal': 0.0,
+    'despesa_mensal': 0.0,
+    'valor_reserva_desejada': 0.0,
+    'aporte_mensal': 0.0,
+    'perfil': 'Moderado'
+}
 
-    col1, col2 = st.columns(2)
-    enviar = col1.form_submit_button("Simular")
-    limpar = col2.form_submit_button("Limpar")
+for campo in campos:
+    if campo not in st.session_state:
+        st.session_state[campo] = campos[campo]
 
-if limpar:
+# Layout
+col1, col2 = st.columns(2)
+
+with col1:
+    st.session_state['renda_mensal'] = st.number_input("Renda Mensal (R$)", value=st.session_state['renda_mensal'], step=100.0, format="%.2f")
+    st.session_state['despesa_mensal'] = st.number_input("Despesas Mensais (R$)", value=st.session_state['despesa_mensal'], step=100.0, format="%.2f")
+    st.session_state['valor_reserva_desejada'] = st.number_input("Reserva de Emergência Desejada (R$)", value=st.session_state['valor_reserva_desejada'], step=100.0, format="%.2f")
+
+with col2:
+    st.session_state['aporte_mensal'] = st.number_input("Aporte Mensal (R$)", value=st.session_state['aporte_mensal'], step=100.0, format="%.2f")
+    st.session_state['perfil'] = st.selectbox("Perfil de Investidor", ["Conservador", "Moderado", "Arrojado"], index=["Conservador", "Moderado", "Arrojado"].index(st.session_state['perfil']))
+
+# Botão de limpar campos
+if st.button("🧹 Limpar Campos"):
+    for campo in campos:
+        st.session_state[campo] = campos[campo]
     st.experimental_rerun()
 
-if enviar:
-    reserva_ideal = calcular_reserva(despesa_mensal, tipo_trabalho, n_dependentes)
-    aporte_necessario = calcular_aporte_necessario(meta, prazo_anos, taxa_retorno_anual)
-    tempo_estimado = calcular_tempo_para_meta(valor_atual, aporte_atual, taxa_retorno_anual, meta)
+# Função de cálculo de evolução do capital
+@st.cache_data
+def calcular_evolucao(valor_inicial, aporte_mensal, taxa_juros, anos):
+    meses = anos * 12
+    valores = []
+    montante = valor_inicial
+    for i in range(meses):
+        montante *= (1 + taxa_juros / 12)
+        montante += aporte_mensal
+        valores.append(montante)
+    return valores
 
-    id_user = str(uuid.uuid4())
-    timestamp = datetime.now().isoformat()
+# Cálculo e gráficos
+if st.session_state['aporte_mensal'] > 0:
+    retornos = [0.05, 0.07, 0.09, 0.12]  # 5%, 7%, 9%, 12%
+    prazos = [("Curto Prazo (3 anos)", 3), ("Médio Prazo (5 anos)", 5), ("Longo Prazo (10 anos)", 10)]
 
-    cursor.execute("""
-        INSERT INTO usuarios VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        id_user, timestamp,
-        despesa_mensal, tipo_trabalho, n_dependentes,
-        valor_atual, meta, prazo_anos,
-        aporte_atual, taxa_retorno_anual,
-        reserva_ideal, aporte_necessario, tempo_estimado
-    ))
-    conn.commit()
+    fig = go.Figure()
 
-    st.success("✅ Simulação realizada com sucesso!")
+    for taxa in retornos:
+        for nome_prazo, anos in prazos:
+            valores = calcular_evolucao(0, st.session_state['aporte_mensal'], taxa, anos)
+            fig.add_trace(go.Scatter(y=valores, mode='lines', name=f"{int(taxa*100)}% a.a. - {nome_prazo}"))
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Reserva de Emergência Ideal", f"R$ {reserva_ideal:,.2f}")
-    col2.metric("Aporte Mensal Necessário", f"R$ {aporte_necessario:,.2f}")
-    col3.metric("Tempo Estimado (anos)", f"{tempo_estimado:.1f}")
-
-    progresso = min(valor_atual / meta, 1.0)
-
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=valor_atual,
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "Progresso da Meta Financeira"},
-        gauge={
-            'axis': {'range': [None, meta]},
-            'bar': {'color': "green"},
-            'steps': [
-                {'range': [0, meta * 0.5], 'color': "lightgray"},
-                {'range': [meta * 0.5, meta], 'color': "gray"},
-            ],
-            'threshold': {
-                'line': {'color': "red", 'width': 4},
-                'thickness': 0.75,
-                'value': meta
-            }
-        }
-    ))
-
+    fig.update_layout(title="Evolução do Patrimônio Acumulado", xaxis_title="Meses", yaxis_title="Valor Acumulado (R$)", height=600)
     st.plotly_chart(fig, use_container_width=True)
+
+    st.success("📊 Escolha uma curva de evolução conforme seu objetivo de prazo e expectativa de retorno!")
+
+# Em breve: Sugestão de carteira com IA
+st.markdown("""
+### 🤖 Recomendação Inteligente (em desenvolvimento)
+Futuramente, este app usará inteligência artificial para sugerir:
+- Alocação ideal de ativos (Renda fixa, ações, fundos, ETFs, etc.)
+- Diversificação com base no perfil de risco
+- Rebalanceamento e acompanhamento periódico
+""")
