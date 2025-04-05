@@ -61,7 +61,7 @@ st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ 
 if st.button("🔍 Obter sugestão personalizada da IA"):
     with st.spinner("Analisando..."):
         prompt = (
-            f"Seja um consultor financeiro brasileiro especialista em construir patrimonio. Com base nos seguintes dados do cliente, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc) e quais estratégias pode seguir para alcançar seu objetivo.\n\n"
+            f"Seja um consultor financeiro brasileiro especialista em construir patrimonio. Com base nos seguintes dados do cliente, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc) e quais estratégias pode seguir para alcançar seu objetivo. Crie um portfolio recomendado, calculando o percentual de cada classe de ativos\n\n"
             f"Renda mensal: R$ {renda_mensal}\n"
             f"Custo mensal: R$ {custo_mensal}\n"
             f"Aporte mensal: R$ {aporte_mensal}\n"
