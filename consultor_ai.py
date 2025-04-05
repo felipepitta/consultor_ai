@@ -1,8 +1,13 @@
-import streamlit as st
 from datetime import datetime
+from typing import Literal
 import math
 import uuid
 import sqlite3
+import streamlit as st
+import plotly.graph_objects as go
+import locale
+
+locale.setlocale(locale.LC_ALL, '')
 
 # --- Banco de dados SQLite ---
 conn = sqlite3.connect("usuarios.db", check_same_thread=False)
@@ -53,19 +58,30 @@ def calcular_tempo_para_meta(valor_atual, aporte_mensal, taxa_retorno_anual, met
     return round(anos, 1)
 
 # --- Interface Streamlit ---
-st.set_page_config(page_title="Finanças com Dados", page_icon="💰")
-st.title("Finanças com Dados 💰")
+st.set_page_config(page_title="Consultor-AI", page_icon="🤖💰")
+st.title("Consultor-AI 🤖💰")
+
+st.markdown("""
+Este é o seu consultor financeiro inteligente. Preencha os dados abaixo para obter sua reserva de emergência ideal,
+quanto você precisa aportar mensalmente e por quanto tempo para atingir sua meta financeira.
+""")
 
 with st.form("simulador_form"):
-    despesa_mensal = st.number_input("Despesa Mensal", min_value=0.0)
-    tipo_trabalho = st.selectbox("Tipo de Trabalho", ["CLT", "Autônomo"])
-    n_dependentes = st.number_input("Número de Dependentes", min_value=0, step=1)
-    valor_atual = st.number_input("Valor Atual Investido", min_value=0.0)
-    meta = st.number_input("Meta Financeira (R$)", min_value=0.0)
-    prazo_anos = st.number_input("Prazo (anos)", min_value=0.0)
-    aporte_atual = st.number_input("Aporte Mensal Atual", min_value=0.0)
-    taxa_retorno_anual = st.number_input("Taxa de Retorno Anual (%)", min_value=0.0)
-    enviar = st.form_submit_button("Simular")
+    despesa_mensal = st.number_input("Despesa Mensal", min_value=0.0, help="Inclua todas as suas despesas mensais como aluguel, comida, transporte, etc.")
+    tipo_trabalho = st.selectbox("Tipo de Trabalho", ["CLT", "Autônomo"], help="Se você trabalha registrado, selecione CLT. Caso contrário, escolha Autônomo.")
+    n_dependentes = st.number_input("Número de Dependentes", min_value=0, step=1, help="Quantas pessoas dependem financeiramente de você?")
+    valor_atual = st.number_input("Valor Atual Investido", min_value=0.0, help="Quanto você já tem investido para sua meta?")
+    meta = st.number_input("Meta Financeira (R$)", min_value=0.0, help="Qual o valor final que você deseja atingir?")
+    prazo_anos = st.number_input("Prazo (anos)", min_value=0.0, help="Em quantos anos você deseja atingir sua meta?")
+    aporte_atual = st.number_input("Aporte Mensal Atual", min_value=0.0, help="Quanto você já consegue investir por mês atualmente?")
+    taxa_retorno_anual = st.number_input("Taxa de Retorno Anual (%)", min_value=0.0, help="Qual a taxa de retorno anual esperada dos seus investimentos?")
+
+    col1, col2 = st.columns(2)
+    enviar = col1.form_submit_button("Simular")
+    limpar = col2.form_submit_button("Limpar")
+
+if limpar:
+    st.experimental_rerun()
 
 if enviar:
     reserva_ideal = calcular_reserva(despesa_mensal, tipo_trabalho, n_dependentes)
@@ -86,7 +102,33 @@ if enviar:
     ))
     conn.commit()
 
-    st.success("Simulação realizada com sucesso!")
-    st.metric("Reserva de Emergência Ideal (R$)", f"{reserva_ideal:.2f}")
-    st.metric("Aporte Mensal Necessário (R$)", f"{aporte_necessario:.2f}")
-    st.metric("Tempo Estimado para Meta (anos)", f"{tempo_estimado:.1f}")
+    st.success("✅ Simulação realizada com sucesso!")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Reserva de Emergência Ideal", f"R$ {reserva_ideal:,.2f}")
+    col2.metric("Aporte Mensal Necessário", f"R$ {aporte_necessario:,.2f}")
+    col3.metric("Tempo Estimado (anos)", f"{tempo_estimado:.1f}")
+
+    progresso = min(valor_atual / meta, 1.0)
+
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=valor_atual,
+        domain={'x': [0, 1], 'y': [0, 1]},
+        title={'text': "Progresso da Meta Financeira"},
+        gauge={
+            'axis': {'range': [None, meta]},
+            'bar': {'color': "green"},
+            'steps': [
+                {'range': [0, meta * 0.5], 'color': "lightgray"},
+                {'range': [meta * 0.5, meta], 'color': "gray"},
+            ],
+            'threshold': {
+                'line': {'color': "red", 'width': 4},
+                'thickness': 0.75,
+                'value': meta
+            }
+        }
+    ))
+
+    st.plotly_chart(fig, use_container_width=True)
