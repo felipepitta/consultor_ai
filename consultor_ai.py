@@ -28,14 +28,14 @@ reserva_emergencia = custo_mensal * 6
 
 # Parâmetros de retorno e prazos
 retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
-prazos = [3, 5, 10]  # anos
+prazos = [3, 5, 10, 15, 20, 25, 30]  # anos
 
 # Simulações com juros compostos corretamente aplicados
 resultados = {}
 for r in retornos:
     retorno_mensal = r / 12
     valores = []
-    for t in prazos:
+    for t in range(1, max(prazos)+1):
         n = t * 12
         if retorno_mensal == 0:
             total = aporte_mensal * n
@@ -47,32 +47,36 @@ for r in retornos:
 # Gráfico de linhas suavizadas
 st.subheader("📈 Projeções de Crescimento Patrimonial")
 fig = go.Figure()
+anos = list(range(1, max(prazos)+1))
 for label, values in resultados.items():
-    fig.add_trace(go.Scatter(x=prazos, y=values, mode='lines+markers', name=label, line_shape='spline'))
+    fig.add_trace(go.Scatter(x=anos, y=values, mode='lines+markers', name=label, line_shape='spline'))
 fig.update_layout(xaxis_title="Prazo (anos)", yaxis_title="R$ Acumulado", height=500)
 st.plotly_chart(fig)
 
 # Mostrar reserva de emergência
 st.subheader("🔒 Reserva de Emergência Ideal")
-st.write(f"Com base em seus custos mensais, sua reserva de emergência ideal é de **R$ {reserva_emergencia:,.2f}**")
+st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ {reserva_emergencia:,.2f}**")
 
 # Sugestão personalizada via IA (HuggingFace)
 if st.button("🔍 Obter sugestão personalizada da IA"):
     with st.spinner("Analisando..."):
         prompt = (
-            f"Dados do cliente:\n"
-            f"- Renda mensal: R$ {renda_mensal}\n"
-            f"- Custo mensal: R$ {custo_mensal}\n"
-            f"- Aporte mensal: R$ {aporte_mensal}\n"
-            f"- Reserva de emergência: R$ {reserva_emergencia:.2f}\n"
-            f"- Perfil de investidor: {perfil}\n"
-            f"- Objetivo financeiro: {objetivo}\n\n"
-            f"Com base nesses dados, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos imobiliarios, etc) e quais estratégias pode seguir para alcançar seu objetivo."
+            f"Seja um consultor financeiro brasileiro especialista em construir patrimonio. Com base nos seguintes dados do cliente, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc) e quais estratégias pode seguir para alcançar seu objetivo.\n\n"
+            f"Renda mensal: R$ {renda_mensal}\n"
+            f"Custo mensal: R$ {custo_mensal}\n"
+            f"Aporte mensal: R$ {aporte_mensal}\n"
+            f"Reserva de emergência: R$ {reserva_emergencia:.2f}\n"
+            f"Perfil de investidor: {perfil}\n"
+            f"Objetivo financeiro: {objetivo}"
         )
         try:
-            resposta = client.text_generation(prompt, max_new_tokens=1000)
+            resposta = client.text_generation(prompt, max_new_tokens=300)
+            resposta_formatada = resposta.strip()
+            if prompt in resposta_formatada:
+                resposta_formatada = resposta_formatada.replace(prompt, "").strip()
+
             st.subheader("🤖 Sugestão da IA")
-            st.write(resposta)
+            st.write(resposta_formatada)
         except Exception as e:
             st.error(f"Erro ao consultar a IA: {e}")
 
