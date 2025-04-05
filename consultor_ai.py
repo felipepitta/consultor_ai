@@ -30,16 +30,20 @@ reserva_emergencia = custo_mensal * 6
 retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
 prazos = [3, 5, 10]  # anos
 
-# Simulações
+# Simulações com juros compostos corretamente aplicados
 resultados = {}
 for r in retornos:
+    retorno_mensal = r / 12
     valores = []
-    for t in range(1, max(prazos) + 1):
-        total = 0
-        for i in range(t * 12):
-            total = (total + aporte_mensal) * (1 + r / 12)
+    for t in prazos:
+        n = t * 12
+        if retorno_mensal == 0:
+            total = aporte_mensal * n
+        else:
+            total = aporte_mensal * ((1 + retorno_mensal) ** n - 1) / retorno_mensal
         valores.append(round(total, 2))
     resultados[f"{int(r*1000)/10}% a.a"] = valores
+
 
 # Gráfico de linhas
 st.subheader("📈 Projeções de Crescimento Patrimonial")
