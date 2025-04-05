@@ -2,10 +2,45 @@ import streamlit as st
 import plotly.graph_objects as go
 from huggingface_hub import InferenceClient
 import os
+import psycopg2
+from datetime import datetime
 
-# Configurar chave da Hugging Face (você pode armazenar em st.secrets ou variáveis de ambiente)
+# Configurar chave da Hugging Face
 hf_key = st.secrets["HUGGINGFACEHUB_API_TOKEN"] if "HUGGINGFACEHUB_API_TOKEN" in st.secrets else os.getenv("HUGGINGFACEHUB_API_TOKEN")
 client = InferenceClient(model="mistralai/Mistral-7B-Instruct-v0.1", token=hf_key)
+
+# Configuração do PostgreSQL
+def salvar_dados(renda, custo, aporte, reserva, perfil, objetivo):
+    try:
+        conn = psycopg2.connect(
+            dbname=st.secrets["DB_NAME"],
+            user=st.secrets["DB_USER"],
+            password=st.secrets["DB_PASSWORD"],
+            host=st.secrets["DB_HOST"],
+            port=st.secrets["DB_PORT"]
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS simulacoes (
+                id SERIAL PRIMARY KEY,
+                data TIMESTAMP,
+                renda_mensal FLOAT,
+                custo_mensal FLOAT,
+                aporte_mensal FLOAT,
+                reserva_emergencia FLOAT,
+                perfil TEXT,
+                objetivo TEXT
+            )
+        """)
+        cur.execute("""
+            INSERT INTO simulacoes (data, renda_mensal, custo_mensal, aporte_mensal, reserva_emergencia, perfil, objetivo)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (datetime.now(), renda, custo, aporte, reserva, perfil, objetivo))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        st.error(f"Erro ao salvar dados no banco: {e}")
 
 st.set_page_config(page_title="Consultor de Investimentos IA", layout="centered")
 st.title("🤖 Consultor Inteligente de Investimentos")
@@ -28,7 +63,7 @@ reserva_emergencia = custo_mensal * 6
 
 # Parâmetros de retorno e prazos
 retornos = [0.05, 0.075, 0.10]  # 5%, 7.5%, 10%
-prazos = [3, 5, 10, 15, 20, 25, 30]  # anos
+prazos = [3, 5, 10, 15, 20, 25, 30, 35]  # anos
 
 # Simulações com juros compostos corretamente aplicados
 resultados = {}
@@ -59,15 +94,16 @@ st.write(f"Com seus custos mensais, sua reserva de emergência ideal é de **R$ 
 
 # Sugestão personalizada via IA (HuggingFace)
 if st.button("🔍 Obter sugestão personalizada da IA"):
-    with st.spinner("Analisando..."):
+    with st.spinner("Consultando IA gratuita (Hugging Face)..."):
         prompt = (
-            f"Seja um consultor financeiro brasileiro especialista em construir patrimonio. Com base nos seguintes dados do cliente, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc) e quais estratégias pode seguir para alcançar seu objetivo. Crie um portfolio recomendado, calculando o percentual de cada classe de ativos\n\n"
+            f"Sou um consultor financeiro. Com base nos seguintes dados do cliente, dê sugestões de como ele pode diversificar seus investimentos, quais ativos pode considerar (renda fixa, ações, fundos, etc) e quais estratégias pode seguir para alcançar seu objetivo.\n"
             f"Renda mensal: R$ {renda_mensal}\n"
             f"Custo mensal: R$ {custo_mensal}\n"
             f"Aporte mensal: R$ {aporte_mensal}\n"
             f"Reserva de emergência: R$ {reserva_emergencia:.2f}\n"
             f"Perfil de investidor: {perfil}\n"
-            f"Objetivo financeiro: {objetivo}"
+            f"Objetivo financeiro: {objetivo}\n"
+            f"Responda iniciando com a palavra 'Sugestão:'"
         )
         try:
             resposta = client.text_generation(prompt)
@@ -77,6 +113,7 @@ if st.button("🔍 Obter sugestão personalizada da IA"):
                 resposta_formatada = "Sugestão: " + resposta_formatada
             st.subheader("🤖 Sugestão da IA")
             st.write(resposta_formatada)
+            salvar_dados(renda_mensal, custo_mensal, aporte_mensal, reserva_emergencia, perfil, objetivo)
         except Exception as e:
             st.error(f"Erro ao consultar a IA: {e}")
 
